@@ -1,0 +1,39 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0d1117; color: #e6edf3; height: 100vh; overflow: hidden; }
+#app { display: flex; flex-direction: column; height: 100vh; max-width: 480px; margin: 0 auto; background: #0d1117; position: relative; }
+header { padding: 0.8rem 1.2rem; background: rgba(22, 27, 34, 0.92); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; z-index: 10; }
+.logo { font-weight: 700; font-size: 1.2rem; color: #58a6ff; }
+.header-actions { display: flex; gap: 0.5rem; align-items: center; }
+.header-actions button { background: rgba(255,255,255,0.04); border: none; color: #e6edf3; padding: 0.3rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 1.1rem; }
+main { flex: 1; overflow-y: auto; padding-bottom: 60px; }
+section { display: none; padding: 0.8rem 1rem; }
+section.active { display: block; }
+.post-card { background: rgba(22,27,34,0.6); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 0.8rem 1rem; margin-bottom: 0.8rem; }
+.post-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem; }
+.post-avatar { font-size: 1.6rem; }
+.post-user { font-weight: 600; font-size: 0.9rem; }
+.post-distance { font-size: 0.7rem; color: #8b949e; margin-left: auto; }
+.post-content { font-size: 0.9rem; line-height: 1.5; margin: 0.3rem 0; }
+.post-category { display: inline-block; font-size: 0.6rem; background: rgba(88,166,255,0.15); color: #58a6ff; padding: 0.1rem 0.5rem; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.05em; }
+.post-time { font-size: 0.65rem; color: #8b949e; margin-top: 0.2rem; }
+#map { height: 70vh; border-radius: 12px; border: 1px solid rgba(255,255,255,0.04); }
+.group-card { background: rgba(22,27,34,0.6); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 0.8rem 1rem; margin-bottom: 0.8rem; }
+.group-name { font-weight: 600; font-size: 1rem; }
+.group-desc { color: #8b949e; font-size: 0.8rem; }
+.group-members { font-size: 0.7rem; color: #8b949e; }
+.group-actions { margin-top: 0.5rem; }
+.profile-avatar { font-size: 4rem; text-align: center; margin: 1rem 0; }
+.profile-username { text-align: center; font-size: 1.4rem; font-weight: 700; }
+.profile-bio { text-align: center; color: #8b949e; margin: 0.5rem 0; }
+#bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; display: flex; justify-content: space-around; background: rgba(20,25,35,0.85); backdrop-filter: blur(16px); border-top: 1px solid rgba(255,255,255,0.06); padding: 0.3rem 0; z-index: 100; }
+.nav-item { background: transparent; border: none; color: #8b949e; font-size: 1.4rem; padding: 0.4rem 1rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+.nav-item.active { color: #58a6ff; background: rgba(88,166,255,0.1); }
+.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: center; justify-content: center; padding: 1rem; }
+.modal.open { display: flex; }
+.modal-content { background: #161b22; border-radius: 16px; padding: 1.5rem; max-width: 400px; width: 100%; border: 1px solid rgba(255,255,255,0.06); position: relative; }
+.modal-content .close { position: absolute; top: 0.5rem; right: 1rem; font-size: 1.5rem; cursor: pointer; color: #8b949e; }
+.modal-content textarea, .modal-content input, .modal-content select { width: 100%; padding: 0.6rem 0.8rem; background: #0d1117; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; color: #e6edf3; font-size: 0.9rem; margin: 0.5rem 0; font-family: inherit; }
+.modal-content textarea { min-height: 80px; resize: vertical; }
+.btn-primary { background: #58a6ff; border: none; color: #0d1117; font-weight: 600; padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; width: 100%; font-size: 0.95rem; }
+.btn-primary:hover { background: #79c0ff; }
+@media (min-width: 600px) { #app { border-left: 1px solid rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.04); } #bottom-nav { border-radius: 0 0 12px 12px; } }

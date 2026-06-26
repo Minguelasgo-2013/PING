@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PING - Red social local</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+
+    <div id="app">
+
+        <!-- HEADER -->
+        <header>
+            <div class="logo">📍 PING</div>
+            <div class="header-actions">
+                <span id="username-display" style="font-size:0.8rem;color:#8b949e;">{{ username }}</span>
+                <button onclick="changeUsername()">✏️</button>
+                <button onclick="refreshFeed()">🔄</button>
+                <button onclick="showPostForm()">+</button>
+                <button onclick="showZoneSelector()" title="Cambiar zona">📍</button>
+            </div>
+        </header>
+
+        <!-- MAIN -->
+        <main id="main-content">
+            <section id="feed" class="active">
+                <div id="feed-list"></div>
+            </section>
+            <section id="map-view">
+                <div id="map"></div>
+            </section>
+            <section id="groups-view">
+                <div id="groups-list"></div>
+                <button onclick="showCreateGroup()" class="btn-primary" style="width:100%;margin-top:1rem;">+ Crear grupo</button>
+            </section>
+            <section id="profile-view">
+                <div id="profile-content"></div>
+            </section>
+        </main>
+
+        <!-- NAV INFERIOR -->
+        <nav id="bottom-nav">
+            <button class="nav-item active" data-target="feed">🏠</button>
+            <button class="nav-item" data-target="map-view">🗺️</button>
+            <button class="nav-item" data-target="groups-view">👥</button>
+            <button class="nav-item" data-target="profile-view">👤</button>
+            <!-- El 5º botón es el de zona, pero lo ponemos en el header -->
+        </nav>
+    </div>
+
+    <!-- MODAL POST -->
+    <div id="post-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('post-modal')">&times;</span>
+            <h2>Nuevo aviso</h2>
+            <textarea id="post-content" placeholder="¿Qué quieres compartir?"></textarea>
+            <select id="post-category">
+                <option value="general">General</option>
+                <option value="venta">Venta</option>
+                <option value="evento">Evento</option>
+                <option value="perdido">Perdido/Encontrado</option>
+                <option value="ayuda">Ayuda</option>
+            </select>
+            <button onclick="submitPost()" class="btn-primary">Publicar</button>
+        </div>
+    </div>
+
+    <!-- MODAL CAMBIAR NOMBRE -->
+    <div id="username-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('username-modal')">&times;</span>
+            <h2>¿Cómo quieres llamarte?</h2>
+            <input id="username-input" placeholder="Tu nombre" value="{{ username }}" />
+            <button onclick="saveUsername()" class="btn-primary">Guardar</button>
+        </div>
+    </div>
+
+    <!-- MODAL GRUPO -->
+    <div id="group-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('group-modal')">&times;</span>
+            <h2>Crear grupo</h2>
+            <input id="group-name" placeholder="Nombre del grupo" />
+            <textarea id="group-desc" placeholder="Descripción"></textarea>
+            <button onclick="submitGroup()" class="btn-primary">Crear grupo</button>
+        </div>
+    </div>
+
+    <!-- MODAL ZONA -->
+    <div id="zone-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('zone-modal')">&times;</span>
+            <h2>📍 Selecciona tu zona</h2>
+            <div id="zone-list" style="display:flex;flex-direction:column;gap:0.5rem;margin:1rem 0;">
+                <!-- Se llenará con JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
