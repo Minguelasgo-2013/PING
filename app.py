@@ -1,60 +1,72 @@
 #!/usr/bin/env python3
 """
 PING - Red social local con Turso (SQLite na nube)
-Versión para Render con variables de ambiente e optimización de memoria
+Versión para Render con conexión diferida a Turso
 """
 
 import os
 import json
+import time
 from datetime import datetime
 from math import radians, sin, cos, sqrt, asin
 from flask import Flask, render_template, request, jsonify, make_response
 
-# ─── TURSO ───
 try:
     import libsql
 except ImportError:
     print("⚠️ libsql non está instalado. Executa: pip install libsql")
     exit(1)
 
-# ─── CONFIGURACIÓN DE FLASK (con estáticos) ───
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'clave-super-secreta')
 
-# ─── CONFIGURACIÓN DE TURSO (variables de ambiente) ───
 TURSO_DATABASE_URL = os.environ.get('TURSO_DATABASE_URL')
 TURSO_AUTH_TOKEN = os.environ.get('TURSO_AUTH_TOKEN')
 
 if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
     print("❌ Erro: TURSO_DATABASE_URL e TURSO_AUTH_TOKEN deben estar definidas.")
-    print("   Engade estas variables de ambiente en Render.")
     exit(1)
 
-conn = libsql.connect("ping.db", sync_url=TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
-conn.sync()
-print("✅ Conectado a Turso (nube)")
+# ─── CONEXIÓN DIFERIDA (Lazy) ───
+def get_connection():
+    """Crea unha nova conexión con Turso ou reconecta se falla."""
+    try:
+        conn = libsql.connect("ping.db", sync_url=TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
+        conn.sync()
+        return conn
+    except Exception as e:
+        print(f"❌ Erro ao conectar con Turso: {e}")
+        return None
 
-# ─── PECHAR CONEXIÓN (opcional, libera memoria) ───
-@app.teardown_appcontext
-def close_connection(exception=None):
-    """Pecha a conexión con Turso ao final de cada petición (se é necesario)"""
-    # libsql xestiona as conexións automaticamente, pero deixámolo por se acaso
-    pass
-
-def execute_query(query, params=()):
-    """Executa unha consulta SQL e devolve os resultados"""
-    cur = conn.cursor()
-    if params:
-        cur.execute(query, params)
-    else:
-        cur.execute(query)
-    if query.strip().upper().startswith(('SELECT', 'PRAGMA')):
-        return cur.fetchall()
-    conn.commit()
+def execute_query(query, params=(), retries=2):
+    """Executa unha consulta SQL con reintentos e reconexión."""
+    conn = None
+    for attempt in range(retries + 1):
+        try:
+            conn = get_connection()
+            if not conn:
+                raise Exception("Non se puido conectar con Turso")
+            cur = conn.cursor()
+            if params:
+                cur.execute(query, params)
+            else:
+                cur.execute(query)
+            if query.strip().upper().startswith(('SELECT', 'PRAGMA')):
+                result = cur.fetchall()
+            else:
+                result = None
+            conn.commit()
+            # Non pechamos a conexión, deixamos que se recolla ao saír da función
+            return result
+        except Exception as e:
+            print(f"⚠️ Intento {attempt+1} fallou: {e}")
+            if attempt == retries:
+                raise Exception(f"Erro ao executar consulta despois de {retries+1} intentos: {e}")
+            time.sleep(0.5)
     return None
 
-# ─── CREAR TÁBOAS ───
-with app.app_context():
+# ─── CREAR TÁBOAS (unha soa vez) ───
+try:
     execute_query("""
         CREATE TABLE IF NOT EXISTS post (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,6 +96,8 @@ with app.app_context():
         )
     """)
     print("✅ Táboas creadas/verificadas en Turso")
+except Exception as e:
+    print(f"❌ Erro ao crear táboas: {e}")
 
 # ─── ZONAS ───
 ZONAS = {
@@ -97,7 +111,6 @@ ZONAS = {
     'coruna': {'nombre': 'A Coruña', 'lat': 43.3623, 'lng': -8.4115}
 }
 
-# ─── UTILIDADES ───
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371
     dlat = radians(lat2 - lat1)
@@ -116,9 +129,7 @@ def index():
 @app.route('/set_username', methods=['POST'])
 def set_username():
     data = request.json
-    username = data.get('username', 'Anónimo').strip()
-    if not username:
-        username = 'Anónimo'
+    username = data.get('username', 'Anónimo').strip() or 'Anónimo'
     resp = make_response(jsonify({'success': True, 'username': username}))
     resp.set_cookie('ping_username', username, max_age=60*60*24*30)
     return resp
@@ -130,8 +141,7 @@ def api_posts():
         lng = request.args.get('lng', type=float)
         if not lat or not lng:
             return jsonify([])
-        # Limitar a 50 posts para non sobrecargar a memoria
-        rows = execute_query("SELECT * FROM post ORDER BY created_at DESC LIMIT 50")
+        rows = execute_query("SELECT * FROM post ORDER BY created_at DESC LIMIT 50") or []
         result = []
         for row in rows:
             if row[4] and row[5]:
@@ -149,13 +159,12 @@ def api_posts():
                     })
         return jsonify(result)
     except Exception as e:
-        print(f"❌ Erro en /api/posts (GET): {e}")
-        return jsonify({'error': 'Erro ao obter posts'}), 500
+        print(f"❌ GET /api/posts: {e}")
+        return jsonify({'error': 'Erro interno'}), 500
 
 @app.route('/api/posts', methods=['POST'])
 def create_post():
     try:
-        print("📥 Recibida petición POST a /api/posts")
         data = request.json
         username = request.cookies.get('ping_username', 'Anónimo')
         content = data.get('content')
@@ -170,19 +179,21 @@ def create_post():
         )
         return jsonify({'success': True})
     except Exception as e:
-        print(f"❌ Erro ao crear post: {e}")
+        print(f"❌ POST /api/posts: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/groups')
 def api_groups():
     try:
         username = request.cookies.get('ping_username', 'Anónimo')
-        rows = execute_query("SELECT * FROM group_table ORDER BY created_at DESC LIMIT 20")
+        rows = execute_query("SELECT * FROM group_table ORDER BY created_at DESC LIMIT 20") or []
         result = []
         for row in rows:
             group_id = row[0]
-            members_count = execute_query("SELECT COUNT(*) FROM group_member WHERE group_id = ?", (group_id,))[0][0]
-            is_member = execute_query("SELECT COUNT(*) FROM group_member WHERE username = ? AND group_id = ?", (username, group_id))[0][0] > 0
+            members_count = execute_query("SELECT COUNT(*) FROM group_member WHERE group_id = ?", (group_id,))
+            members_count = members_count[0][0] if members_count else 0
+            is_member = execute_query("SELECT COUNT(*) FROM group_member WHERE username = ? AND group_id = ?", (username, group_id))
+            is_member = is_member[0][0] > 0 if is_member else False
             result.append({
                 'id': group_id,
                 'name': row[1],
@@ -192,19 +203,19 @@ def api_groups():
             })
         return jsonify(result)
     except Exception as e:
-        print(f"❌ Erro en /api/groups (GET): {e}")
-        return jsonify({'error': 'Erro ao obter grupos'}), 500
+        print(f"❌ GET /api/groups: {e}")
+        return jsonify({'error': 'Erro interno'}), 500
 
 @app.route('/api/groups/<int:group_id>/join', methods=['POST'])
 def join_group(group_id):
     try:
         username = request.cookies.get('ping_username', 'Anónimo')
-        existing = execute_query("SELECT COUNT(*) FROM group_member WHERE username = ? AND group_id = ?", (username, group_id))[0][0]
-        if existing == 0:
+        existing = execute_query("SELECT COUNT(*) FROM group_member WHERE username = ? AND group_id = ?", (username, group_id))
+        if existing and existing[0][0] == 0:
             execute_query("INSERT INTO group_member (username, group_id) VALUES (?, ?)", (username, group_id))
         return jsonify({'success': True})
     except Exception as e:
-        print(f"❌ Erro ao unirse ao grupo: {e}")
+        print(f"❌ POST /api/groups/join: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/groups', methods=['POST'])
@@ -220,11 +231,14 @@ def create_group():
             "INSERT INTO group_table (name, description, created_by) VALUES (?, ?, ?)",
             (name, description, username)
         )
-        row = execute_query("SELECT last_insert_rowid()")[0][0]
-        execute_query("INSERT INTO group_member (username, group_id) VALUES (?, ?)", (username, row))
-        return jsonify({'success': True, 'id': row})
+        row = execute_query("SELECT last_insert_rowid()")
+        if row:
+            group_id = row[0][0]
+            execute_query("INSERT INTO group_member (username, group_id) VALUES (?, ?)", (username, group_id))
+            return jsonify({'success': True, 'id': group_id})
+        return jsonify({'error': 'Non se puido crear o grupo'}), 500
     except Exception as e:
-        print(f"❌ Erro ao crear grupo: {e}")
+        print(f"❌ POST /api/groups: {e}")
         return jsonify({'error': str(e)}), 500
 
 # ─── RUTAS DE ZONAS ───
@@ -239,27 +253,19 @@ def set_zone():
             return resp
         return jsonify({'error': 'Zona non válida'}), 400
     except Exception as e:
-        print(f"❌ Erro en set_zone: {e}")
+        print(f"❌ set_zone: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/zones')
 def get_zones():
-    try:
-        return jsonify([{'id': k, 'nombre': v['nombre'], 'lat': v['lat'], 'lng': v['lng']} for k, v in ZONAS.items()])
-    except Exception as e:
-        print(f"❌ Erro en get_zones: {e}")
-        return jsonify({'error': str(e)}), 500
+    return jsonify([{'id': k, 'nombre': v['nombre'], 'lat': v['lat'], 'lng': v['lng']} for k, v in ZONAS.items()])
 
 @app.route('/api/current_zone')
 def get_current_zone():
-    try:
-        zone = request.cookies.get('ping_zone', 'lalin')
-        if zone in ZONAS:
-            return jsonify({'zone': zone, 'coords': ZONAS[zone]})
-        return jsonify({'zone': 'lalin', 'coords': ZONAS['lalin']})
-    except Exception as e:
-        print(f"❌ Erro en get_current_zone: {e}")
-        return jsonify({'error': str(e)}), 500
+    zone = request.cookies.get('ping_zone', 'lalin')
+    if zone in ZONAS:
+        return jsonify({'zone': zone, 'coords': ZONAS[zone]})
+    return jsonify({'zone': 'lalin', 'coords': ZONAS['lalin']})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
