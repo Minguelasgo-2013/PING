@@ -3,4 +3,4 @@ Flask-SQLAlchemy==3.0.5
 Flask-Login==0.6.2
 geopy==2.3.0
 libsql
-
+gunicorn
