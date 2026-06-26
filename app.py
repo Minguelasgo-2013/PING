@@ -17,7 +17,8 @@ except ImportError:
     print("⚠️ libsql non está instalado. Executa: pip install libsql")
     exit(1)
 
-app = Flask(__name__)
+# ─── CONFIGURACIÓN DE FLASK (con estáticos) ───
+app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'clave-super-secreta')
 
 # ─── CONFIGURACIÓN DE TURSO (variables de ambiente) ───
